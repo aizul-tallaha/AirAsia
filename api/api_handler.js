@@ -12,35 +12,81 @@ var connection = mysql.createConnection({
 	database : 'airasia'
 });
 
-api_handler.use(session({
-	secret: 'secret',
-	resave: true,
-	saveUninitialized: true
-}));
-
-api_handler.get('/test', function(req, res) {
-var response = token_handler.generateAccessToken("TEST");
-res.writeHead(200,{'x-auth-token':'Auth Token'});
-res.write(JSON.stringify({message: response}));
-res.end();
+connection.connect( function(err) {
+  if (err) throw err;
+  console.log("Database Connected!");
 });
 
-api_handler.get('/users/:id/roles', function(req, res) {
+api_handler.post('/users/:id/permissions', token_handler.authenticateToken, function(req, res) {
+	var user_name = req.params.id;
+	var permission_array = req.body;
+	var sql_cmd = "SELECT userRole FROM Users WHERE userName = '" + user_name + "';";
 
+	connection.query(sql_cmd, function(err, result, fields) {
+		if (err) throw err;
+
+		if (result.length > 0) {
+			res.status(200).json({ status:"KIV", result:"Development in progress" });			
+
+		} else {
+			res.status(400).json({ status:"NG", result:"User does not exist" });
+		}
+	});
 });
 
-api_handler.get('/roles', function(req, res) {
-      var sql_cmd = "SELECT * FROM Roles";
+api_handler.get('/users/:id/roles', token_handler.authenticateToken, function(req, res) {
+	var user_name = req.params.id;
+	var sql_cmd = "SELECT userRole FROM Users WHERE userName = '" + user_name + "';";
+
+	connection.query(sql_cmd, function(err, result, fields) {
+		if (err) throw err;
+
+		if (result.length > 0) {
+				res.status(200).json({ status:"OK", result:result });
+
+		} else {
+			res.status(400).json({ status:"NG", result:"User does not exist" });
+		}
+	});
+});
+
+api_handler.post('/users/:id/roles', token_handler.authenticateToken, function(req, res) {
+	var user_name = req.params.id;
+	var role_array = req.body.roleArr;
+	var sql_cmd = "SELECT userPwd, userEmail FROM Users WHERE userName = '" + user_name + "';";
+
+	connection.query(sql_cmd, function(err, result, fields) {
+    if (err) throw err;
+		if (result.length > 0) {
+			for (var i=0; i< role_array.length; i++) {
+				var sql_cmd = "INSERT INTO Users (userName, userPwd, userEmail, userRole) VALUES ('" + user_name + "', '" + result[0].userPwd + "', '" + result[0].userEmail + "', '" + role_array[i] + "');";
+				connection.query(sql_cmd, function(err, result, fields) {
+					if (err) throw err;
+				});
+			}
+			res.status(200).json({ status:"OK", result:"Roles inserted for userName='" + user_name + "'" });
+
+		} else {
+			res.status(400).json({ status:"NG", result:"User does not exist" });
+		}
+	});
+});
+
+api_handler.get('/roles', token_handler.authenticateToken, function(req, res) {
+      var sql_cmd = "SELECT roleName FROM Roles";
       connection.query(sql_cmd, function(err, result, fields) {
         if (err) throw err;
 
         if (result.length > 0) {
           res.status(200).json({ status:"OK", result:result });
-        }
+
+				} else {
+					res.status(400).json({ status:"NG", result:"User does not exist" });
+				}
       });
 });
 
-api_handler.post('/roles', function(req, res) {
+api_handler.post('/roles', token_handler.authenticateToken, function(req, res) {
   var role_name = req.body.roleName;
   var permission_array = req.body.permissionsArr;
 
@@ -51,15 +97,15 @@ api_handler.post('/roles', function(req, res) {
         if (err) throw err;
       });
     }
-    res.status(200)({ status:"OK", result:"New roles with permissions inserted"}));
+    res.status(200).json({ status:"OK", result:"New role with permissions inserted" });
 
   } else {
-    res.status(400).json({ status: "OK", result: "Empty Role Name or Permissions sent"}));
+    res.status(400).json({ status: "NG", result: "Empty Role Name or Permissions sent" });
   }
 });
 
 
-api_handler.get('/permissions', function(req, res) {
+api_handler.get('/permissions', token_handler.authenticateToken, function(req, res) {
       var sql_cmd = "SELECT * FROM Permissions";
       connection.query(sql_cmd, function(err, result, fields) {
         if (err) throw err;
@@ -70,7 +116,7 @@ api_handler.get('/permissions', function(req, res) {
       });
 });
 
-api_handler.post('/permissions', function(req, res) {
+api_handler.post('/permissions', token_handler.authenticateToken, function(req, res) {
   var permission_name = req.body.permissionName;
 
   if (permission_name) {
@@ -79,7 +125,7 @@ api_handler.post('/permissions', function(req, res) {
     connection.query(sql_cmd, function (err, result) {
       if (err) throw err;
 
-      res.status(200).json({ status:"OK", result:"New permission='" + permission_name + "' inserted" }));
+      res.status(200).json({ status:"OK", result:"New permission='" + permission_name + "' inserted" });
     });
   } else {
     res.status(400).json({ status:"NG", result:"Empty permission sent" });
@@ -95,15 +141,15 @@ api_handler.post('/signup', function(req, res){
 
 	if (user_name && user_email && user_pwd1 && user_pwd2) {
     if (user_pwd1 != user_pwd2) {
-      res.status(400).json({ status:"NG", result:"Password and Repeat Password do not match" }));
+      res.status(400).json({ status:"NG", result:"Password and Repeat Password do not match" });
     } else {
       var sql_cmd = "INSERT INTO Users (userName, userPwd, userEmail, userRole) VALUES ('" + user_name + "', '" + user_pwd1 + "', '" + user_email + "', '" + user_role + "');";
 
       connection.query(sql_cmd, function (err, result) {
         if (err) throw err;
 
-        //res.redirect('/user/signup_successful');
-        res.status(200).json({ status:"OK", result:"Username= '" + user_name + "' inserted" }));
+        //res.redirect('/web/signup_successful');
+        res.status(200).json({ status:"OK", result:"Username='" + user_name + "' inserted" });
       });
     }
 	} else {
@@ -123,7 +169,7 @@ api_handler.post('/login', function(req, res){
 
       if (result.length > 0) {
         var token = token_handler.generateAccessToken(user_name);
-        //res.redirect('/user/dashboard');
+        //res.redirect('/web/dashboard');
         res.status(200).json({ status:"OK", result:token });
       }
     });

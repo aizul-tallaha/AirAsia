@@ -1,9 +1,9 @@
-const express = require('express');
 const PORT = 8080;
 
+var express = require('express');
 var app = express();
-var api_handler = require('./api_handler.js');
-var web_handler = require('./web_handler.js');
+var api_handler = require('./api/api_handler.js');
+var web_handler = require('./api/web_handler.js');
 
 var bodyParser = require('body-parser');
 var path = require('path');
